@@ -1,15 +1,29 @@
 package notepad1;
 
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 
 import javax.swing.BorderFactory;
+import javax.swing.BoxLayout;
 import javax.swing.JFrame;
+import javax.swing.JLabel;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
+import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
+import javax.swing.event.UndoableEditEvent;
+import javax.swing.event.UndoableEditListener;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.DefaultHighlighter;
+import javax.swing.text.Highlighter;
+import javax.swing.undo.UndoManager;
 
 public class GUI implements ActionListener {
 	//Importa os requisitos:
@@ -18,13 +32,23 @@ public class GUI implements ActionListener {
 	boolean wordWrapOn = false; 
 	JScrollPane scrollPane;
 	JMenuBar menuBar;
-	JMenu menuFile, menuEdit, menuOptions, menuHelp;
-	JMenuItem iNew, iOpen, iSave, iSaveAs, iExit, iTest;
+	JMenu menuFile, menuEdit, menuOptions;
+	JMenuItem iNew, iOpen, iSave, iSaveAs, iExit;
+	JMenuItem iUndo, iRedo;
 	JMenuItem iWrap, iFontEnchant, iFontArial, iFontTNR, iFontSize8, iFontSize12, iFontSize16, iFontSize20, iFontSize24, iFontSize28;
 	JMenu menuFont, menuFontSize;
+	JMenu iColorMenu;
+	JMenuItem iColor1, iColor2, iColor3;
+	JLabel wordCountLabel, charCountLabel;
 	
 	Function_File file = new Function_File(this);
 	Function_Options format = new Function_Options(this);
+	Function_Color color = new Function_Color(this);
+	Function_Edit edit = new Function_Edit(this);
+	
+	KeyHandler kHandler = new KeyHandler(this);
+	
+	UndoManager um = new UndoManager();
 	
 	//Inicializa o GUI
 	public static void main(String[] args) {
@@ -37,10 +61,13 @@ public class GUI implements ActionListener {
 		createTextArea();
 		createMenuBar();
 		createFileMenu();
+		createEditMenu();
 		createOptionsMenu();
+		createColorMenu();
 		format.selectedFont = "Arial";
 		format.createFont(16);
 		format.wordWrap();
+		color.changeColor("Black");
 		window.setVisible(true);
 	}
 	
@@ -54,11 +81,98 @@ public class GUI implements ActionListener {
 	//Cria a TextBox do projeto
 	public void createTextArea() {
 		textArea = new JTextArea();
+		textArea.setMargin(new Insets(0, 15, 0, 0));
+		
+		// Adiciona um CaretListener para detectar onde está o cursor
+	    textArea.addCaretListener(e -> {
+	        try {
+	            // Remove os destaques antigos
+	            Highlighter highlighter = textArea.getHighlighter();
+	            highlighter.removeAllHighlights();
+
+	            // Posição do cursor
+	            int caretPos = textArea.getCaretPosition();
+
+	            // Identifica a linha onde o cursor está
+	            int line = textArea.getLineOfOffset(caretPos);
+
+	            // Obtém o início e o final da linha onde o cursor está
+	            int start = textArea.getLineStartOffset(line);
+	            int end = textArea.getLineEndOffset(line);
+
+	            // Estilo de destaque da linha com fundo suave
+	            Highlighter.HighlightPainter painter = new DefaultHighlighter.DefaultHighlightPainter(new Color(32, 32, 32)); // Azul claro suave
+
+	            // Destaca a linha inteira
+	            highlighter.addHighlight(start, end, painter);
+	        } catch (BadLocationException ex) {
+	            ex.printStackTrace();
+	        }
+	    });
+		
+		textArea.addKeyListener(kHandler);
+		
+		textArea.getDocument().addUndoableEditListener(
+				new UndoableEditListener() {
+					public void undoableEditHappened(UndoableEditEvent e) {
+						um.addEdit(e.getEdit());
+					}
+				});
+		
+		// Adiciona DocumentListener para contagem de palavras e caracteres
+        textArea.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                updateCounters();
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                updateCounters();
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+                updateCounters();
+            }
+        });
+		
 		scrollPane = new JScrollPane(textArea, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
 		scrollPane.setBorder(BorderFactory.createEtchedBorder());
 		window.add(scrollPane);
 		//window.add(textArea);
+		
+		// Painel para exibir a contagem de palavras e caracteres
+		JPanel bottomPanel = new JPanel();
+		bottomPanel.setLayout(new BoxLayout(bottomPanel, BoxLayout.Y_AXIS));  // Definindo o layout vertical
+
+		wordCountLabel = new JLabel("Words: 0");
+		charCountLabel = new JLabel("Characters: 0");
+
+		bottomPanel.add(wordCountLabel);
+		bottomPanel.add(charCountLabel);
+		window.add(bottomPanel, BorderLayout.EAST);
+		
+		
+		
 	}
+	
+	private void updateCounters() {
+        String text = textArea.getText();
+
+        // Conta as palavras (separadas por espaços)
+        int wordCount = text.split("\\s+").length;
+        if (text.trim().isEmpty()) {
+            wordCount = 0; // Se o texto estiver vazio
+        }
+
+        // Conta os caracteres
+        int charCount = text.length();
+
+        // Atualiza os rótulos
+        wordCountLabel.setText("Words: " + wordCount);
+        charCountLabel.setText("Characters: " + charCount);
+    }
 	
 	//Cria a barra do menu e implementa as opções nele
 	public void createMenuBar() {
@@ -71,8 +185,6 @@ public class GUI implements ActionListener {
 		menuBar.add(menuEdit);
 		menuOptions = new JMenu("Options");
 		menuBar.add(menuOptions);
-		menuHelp = new JMenu("?");
-		menuBar.add(menuHelp);
 	}
 	
 	public void createFileMenu() {
@@ -101,19 +213,21 @@ public class GUI implements ActionListener {
 		iExit.addActionListener(this);
 		iExit.setActionCommand("Exit");
 		menuFile.add(iExit);
-
-		
-		//Sub-lista de Edit
-		iTest = new JMenuItem("Test");
-		menuEdit.add(iTest);
-
-		
-		//Sub-lista de Options
-
-		
-		//Sub-lista de Help(?)
 		
 	}
+	
+	public void createEditMenu() {
+		iUndo = new JMenuItem("Undo");
+		iUndo.addActionListener(this);
+		iUndo.setActionCommand("Undo");
+		menuEdit.add(iUndo);
+		
+		iRedo = new JMenuItem("Redo");
+		iRedo.addActionListener(this);
+		iRedo.setActionCommand("Redo");
+		menuEdit.add(iRedo);
+	}
+	
 	public void createOptionsMenu() {
 		iWrap = new JMenuItem("Word Wrap: Off");
 		iWrap.addActionListener(this);
@@ -172,6 +286,25 @@ public class GUI implements ActionListener {
 		menuFontSize.add(iFontSize28);
 	}
 	
+	public void createColorMenu() {
+		iColorMenu = new JMenu("Color");
+		menuOptions.add(iColorMenu);
+		
+		iColor1 = new JMenuItem("White");
+		iColor1.addActionListener(this);
+		iColor1.setActionCommand("White");
+		iColorMenu.add(iColor1);
+		iColor2 = new JMenuItem("Black");
+		iColor2.addActionListener(this);
+		iColor2.setActionCommand("Black");
+		iColorMenu.add(iColor2);
+		iColor3 = new JMenuItem("Blue");
+		iColor3.addActionListener(this);
+		iColor3.setActionCommand("Blue");
+		iColorMenu.add(iColor3);
+
+	}
+	
 	//Controla as ações dos botões de barra de menu
 	@Override
 	public void actionPerformed(ActionEvent e) {
@@ -182,6 +315,9 @@ public class GUI implements ActionListener {
 		case "Save":  file.saveFile(); break;
 		case "SaveAs":  file.saveAsFile(); break;
 		case "Exit": file.exitFile(); break;
+		
+		case "Undo": edit.undo(); break;
+		case "Redo": edit.redo(); break;
 		
 		case "Word Wrap": format.wordWrap(); break;
 		
@@ -195,6 +331,10 @@ public class GUI implements ActionListener {
 		case "size20": format.createFont(20); break;
 		case "size24": format.createFont(24); break;
 		case "size28": format.createFont(28); break;
+		
+		case "White": color.changeColor(command);
+		case "Black": color.changeColor(command);
+		case "Blue": color.changeColor(command);
 		}
 	}
 }
