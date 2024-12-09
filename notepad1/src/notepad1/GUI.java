@@ -2,9 +2,11 @@ package notepad1;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Font;
 import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.InputStream;
 
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
@@ -16,6 +18,7 @@ import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
+import javax.swing.border.Border;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.event.UndoableEditEvent;
@@ -35,11 +38,13 @@ public class GUI implements ActionListener {
 	JMenu menuFile, menuEdit, menuOptions;
 	JMenuItem iNew, iOpen, iSave, iSaveAs, iExit;
 	JMenuItem iUndo, iRedo;
-	JMenuItem iWrap, iFontEnchant, iFontArial, iFontTNR, iFontSize8, iFontSize12, iFontSize16, iFontSize20, iFontSize24, iFontSize28;
+	JMenuItem iWrap, iFontEnchant, iFontArial, iFontDigital, iFontTNR, iFontSize8, iFontSize12, iFontSize16, iFontSize20, iFontSize24, iFontSize28;
 	JMenu menuFont, menuFontSize;
 	JMenu iColorMenu;
 	JMenuItem iColor1, iColor2, iColor3;
 	JLabel wordCountLabel, charCountLabel;
+	JLabel clockLabel;
+	JLabel dateLabel;
 	
 	Function_File file = new Function_File(this);
 	Function_Options format = new Function_Options(this);
@@ -57,6 +62,7 @@ public class GUI implements ActionListener {
 	
 	//Executa o GUI e permite visualização
 	public GUI() {
+		startClock();
 		createWindow();
 		createTextArea();
 		createMenuBar();
@@ -80,6 +86,8 @@ public class GUI implements ActionListener {
 	
 	//Cria a TextBox do projeto
 	public void createTextArea() {
+		Font digitalFont = loadDigitalFont();
+		
 		textArea = new JTextArea();
 		textArea.setMargin(new Insets(0, 15, 0, 0));
 		
@@ -138,24 +146,82 @@ public class GUI implements ActionListener {
         });
 		
 		scrollPane = new JScrollPane(textArea, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-		scrollPane.setBorder(BorderFactory.createEtchedBorder());
+		scrollPane.setBorder(BorderFactory.createEmptyBorder());
 		window.add(scrollPane);
 		//window.add(textArea);
 		
 		// Painel para exibir a contagem de palavras e caracteres
 		JPanel bottomPanel = new JPanel();
 		bottomPanel.setLayout(new BoxLayout(bottomPanel, BoxLayout.Y_AXIS));  // Definindo o layout vertical
+		bottomPanel.setBorder(BorderFactory.createEmptyBorder(10, 25, 10, 25));
+		bottomPanel.setBackground(new Color(32, 32, 32)); // Fundo preto para vibe digital
+		
+		//Painel de tempo
+		clockLabel = new JLabel("00:00:00");
+		clockLabel.setHorizontalAlignment(JLabel.CENTER); // Centralizar o texto
+		clockLabel.setFont(digitalFont);
+	    clockLabel.setForeground(Color.GRAY); // Texto verde neon
+		bottomPanel.add(clockLabel); // Adiciona o relógio ao painel
+		
+		// Criação da data
+		dateLabel = new JLabel("01/01/2024");
+		dateLabel.setHorizontalAlignment(JLabel.CENTER); // Centralizar o texto
+		dateLabel.setFont(digitalFont);
+	    dateLabel.setForeground(Color.GRAY); // Texto verde neon
+		bottomPanel.add(dateLabel); // Adiciona a data ao painel
+		
 
 		wordCountLabel = new JLabel("Words: 0");
+		wordCountLabel.setFont(digitalFont.deriveFont(20f));
+		wordCountLabel.setForeground(Color.GRAY);
+	    bottomPanel.add(wordCountLabel);
 		charCountLabel = new JLabel("Characters: 0");
+		charCountLabel.setFont(digitalFont.deriveFont(20f));
+	    charCountLabel.setForeground(Color.GRAY);
 
 		bottomPanel.add(wordCountLabel);
 		bottomPanel.add(charCountLabel);
+		
+		dateLabel.setBorder(createGlowingBorder(Color.GRAY));
+		clockLabel.setBorder(createGlowingBorder(Color.GRAY));
+		wordCountLabel.setBorder(createGlowingBorder(Color.GRAY));
+		charCountLabel.setBorder(createGlowingBorder(Color.GRAY));
+		
 		window.add(bottomPanel, BorderLayout.EAST);
 		
-		
-		
 	}
+	
+	private Border createGlowingBorder(Color color) {
+	    return BorderFactory.createCompoundBorder(
+	        BorderFactory.createLineBorder(color, 0), // Cor externa
+	        BorderFactory.createEmptyBorder(5, 5, 5, 5) // Espaçamento interno
+	    );
+	}
+	
+		
+	private Font loadDigitalFont() {
+	    try {
+	        InputStream is = getClass().getResourceAsStream("/fonts/Digital-7.ttf");
+	        return Font.createFont(Font.TRUETYPE_FONT, is).deriveFont(30f); // Tamanho da fonte
+	    } catch (Exception e) {
+	        e.printStackTrace();
+	        return new Font("Monospaced", Font.PLAIN, 30); // Fallback
+	    }
+	}
+	
+	private void startClock() {
+		javax.swing.Timer timer = new javax.swing.Timer(1000, e -> {
+	        java.time.LocalTime now = java.time.LocalTime.now();
+	        clockLabel.setText(now.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss")));
+	        
+	     // Atualiza a data (verifica apenas uma vez por dia)
+	        java.time.LocalDate today = java.time.LocalDate.now();
+	        dateLabel.setText(today.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+	    });
+	    timer.start();
+	}
+	
+	
 	
 	private void updateCounters() {
         String text = textArea.getText();
@@ -241,6 +307,11 @@ public class GUI implements ActionListener {
 		iFontEnchant.setActionCommand("Minecraft Enchantment");
 		menuFont.add(iFontEnchant);
 		
+		iFontDigital = new JMenuItem("Digital-7");
+		iFontDigital.addActionListener(this);
+		iFontDigital.setActionCommand("Digital-7");
+		menuFont.add(iFontDigital);
+		
 		iFontArial = new JMenuItem("Arial");
 		iFontArial.addActionListener(this);
 		iFontArial.setActionCommand("Arial");
@@ -324,6 +395,7 @@ public class GUI implements ActionListener {
 		case "Arial": format.setFont(command); break;		
 		case "Minecraft Enchantment": format.setFont(command); break;
 		case "Times New Roman": format.setFont(command); break;
+		case "Digital-7": format.setFont(command); break;
 		
 		case "size8": format.createFont(8); break;
 		case "size12": format.createFont(12); break;
@@ -332,9 +404,9 @@ public class GUI implements ActionListener {
 		case "size24": format.createFont(24); break;
 		case "size28": format.createFont(28); break;
 		
-		case "White": color.changeColor(command);
-		case "Black": color.changeColor(command);
-		case "Blue": color.changeColor(command);
+		case "White": color.changeColor(command); break;
+		case "Black": color.changeColor(command); break;
+		case "Blue": color.changeColor(command); break;
 		}
 	}
 }
